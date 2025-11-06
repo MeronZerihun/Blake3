@@ -1,9 +1,4 @@
 
-// Translated from VHDL blake3.vhd to Verilog using ChatGPT
-// This is a straightforward behavioral translation (intended for synthesis or simulation).
-// Note: uses Verilog-2001 style; some tools may require SystemVerilog for variable part-selects.
-// Ports and behavior mirror the original VHDL implementation.
-
 module blake3 (
     input        i_clk,
     input        i_reset, 
@@ -22,12 +17,11 @@ module blake3 (
     state_t state, state_n;
     logic [2:0] r_round;
 
-    // Internal registers
-    logic [31:0] v [0:15]; // initial state v0...v15
+    logic [31:0] v [0:15]; 
     logic [511:0] r_mblock;
     logic [511:0] r_mblock_buf;
 
-    // Constants (initialization vector)
+    // Initialization vector
     localparam [31:0] c_IV [0:7] = {
         32'h6a09e667,
         32'hbb67ae85,
@@ -50,21 +44,17 @@ module blake3 (
         input [31:0] x;
         input integer n;
         begin
-            // Assume 8-bit, 0100 1100 n: 6 (0011 0001) -> ...01 | 0100 1100 00 = 0011 0001 ()
             ror32 = (x >> n) | (x << (32 - n));
         end
     endfunction
 
    
-    // The VHDL used impure functions that read v and r_mblock directly.
-    // We'll implement equivalent functions that reference module regs directly.
     // G-function internals (Page 5)
-    function [31:0] f_A1; // v[A] + v[B] + m[M]
+    function [31:0] f_A1; 
         input integer A;
         input integer B;
         input integer M;
         begin
-            // f_A1 = v[A] + v[B] + r_mblock[(M*32)+32-1:(M)*32];
             case (M)
                 0:  f_A1 = v[A] + v[B] + r_mblock[31:0];
                 1:  f_A1 = v[A] + v[B] + r_mblock[63:32];
@@ -86,7 +76,7 @@ module blake3 (
         end
     endfunction
 
-    function [31:0] f_D1; // (v[D] xor f_A1(...)) ror 16
+    function [31:0] f_D1;
         input integer A; input integer B; input integer D; input integer M;
         begin
             f_D1 = ror32( (v[D] ^ f_A1(A,B,M-1)), 16 );
@@ -110,8 +100,6 @@ module blake3 (
     function [31:0] f_A2;
         input integer A; input integer B; input integer C; input integer D; input [4:0] M;
         begin
-            // Note: VHDL used an extra access to r_mblock with different indices; replicate exactly:
-            // f_A2 := f_A1 + f_B1 + r_mblock((32*v_M)+31 downto (v_M)*32);
             case (M)
                 0:  f_A2 = f_A1(A,B,M-1) + f_B1(A,B,C,D,M) + r_mblock[31:0];
                 1:  f_A2 = f_A1(A,B,M-1) + f_B1(A,B,C,D,M) + r_mblock[63:32];
@@ -188,7 +176,6 @@ module blake3 (
         if (i_reset) begin
             o_valid <= 1'b0;
             o_hash <= 512'b0;
-            // clear regs
             r_round <= 3'd0;
             r_mblock <= 512'b0;
             r_mblock_buf <= 512'b0;
@@ -202,7 +189,6 @@ module blake3 (
                 end
 
                 STATE_PREPARE: begin
-                    // Sample inputs into internal regs and initialize v
                     v[0] <= i_chain[31 : 0];
                     v[1] <= i_chain[63 : 32];
                     v[2] <= i_chain[95 : 64];
@@ -217,7 +203,6 @@ module blake3 (
                     v[10] <= c_IV[2];
                     v[11] <= c_IV[3];
 
-                    // inject counter, numbytes, dflags into v[12..15] like original:
                     v[12] <= i_counter[31:0];
                     v[13] <= i_counter[63:32];
                     v[14] <= i_numbytes;
@@ -252,7 +237,7 @@ module blake3 (
                     v[11] <= f_C2(3, 7, 11, 15, 7);
                     v[15] <= f_B2(3, 7, 11, 15, 7);
 
-                    // Done - move to diagonals
+                    // Update r_mblock_buf to the permuted message block
                     r_mblock_buf <= r_mblock;
                     
                 end

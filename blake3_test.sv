@@ -12,7 +12,7 @@ module blake3_tb;
 
     logic [511:0] r_hash;
     logic         r_o_valid;
-    logic [511:0] c_hash;
+    logic [511:0] c_HASH;
 
     logic correct;
 
@@ -30,7 +30,7 @@ module blake3_tb;
         .o_valid    (r_o_valid)
     );
 
-    assign correct = ~r_o_valid || (r_hash === c_hash);
+    assign correct = ~r_o_valid || (r_hash === c_HASH);
 
     // CLOCK_PERIOD is defined on the commandline by the makefile
     always begin
@@ -58,10 +58,9 @@ module blake3_tb;
 
     initial begin
 
-        $monitor("Time:%5d mblock: %h r_hash:%h c_hash: %h", 
-                 $time, c_MBLOCK, r_hash, c_hash);
+        $monitor("Time:%5d mblock: %h r_hash:%h c_hash: %h state: %b", 
+                 $time, c_MBLOCK, r_hash, c_HASH, dut.state);
 
-        // Initialize
         w_clk = 0;
         w_reset = 1;
         r_i_valid = 0;
@@ -70,7 +69,9 @@ module blake3_tb;
         c_COUNTER = 64'h0;
         c_NUMBYTES = 32'h0;
         c_DFLAGS = 32'h0;
-        c_hash = {
+
+        // Initializing inputs
+        c_HASH = {
             32'hc5b847a2,
             32'ha79985ee, 
             32'hdb01f61a,
@@ -89,8 +90,16 @@ module blake3_tb;
             32'he2c6dc92
         };
 
-        c_CHAIN = {32'h5be0cd19, 32'h1f83d9ab, 32'h9b05688c, 32'h510e527f,
-                  32'ha54ff53a, 32'h3c6ef372, 32'hbb67ae85, 32'h6a09e667
+        // IV7 - IV0
+        c_CHAIN = {
+            32'h5be0cd19, 
+            32'h1f83d9ab, 
+            32'h9b05688c, 
+            32'h510e527f,
+            32'ha54ff53a, 
+            32'h3c6ef372, 
+            32'hbb67ae85, 
+            32'h6a09e667
         };
         
         c_MBLOCK = {
@@ -107,12 +116,12 @@ module blake3_tb;
         c_DFLAGS = 32'b0000_0000_0000_0000_0000_0000_0000_1011;
 
         @(negedge w_clk);
-        w_reset = 0;
         r_i_valid = 1;
+        w_reset = 0;
         wait_until_done();
 
         // Wait for output
-        $display("Passed; r_o_valid=%b r_hash=%h c_hash=%h", r_o_valid, r_hash, c_hash);
+        $display("Passed; r_o_valid=%b r_hash=%h c_hash=%h", r_o_valid, r_hash, c_HASH);
 
         $finish;
     end
