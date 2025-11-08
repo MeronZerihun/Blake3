@@ -1,6 +1,6 @@
 
-// Clock Period (Slack met):  14ns/cycle (71.4MHz)
-// Time = 14 ns/cycle * (2 + (1 * 7)) cycles = 126ns
+// Clock Period (Slack met): 14.5ns/cycle (67 MHz)
+// Time =  14.5ns/cycle * (1 + (1 * 7)) cycles = 116ns
 module blake3 (
     input        clock,
     input        reset, 
