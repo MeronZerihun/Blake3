@@ -15,7 +15,7 @@ module blake3 (
 );
 
     // State machine
-    typedef enum logic [2:0] { STATE_IDLE, STATE_G, STATE_OUTPUT } state_t;
+    typedef enum logic [1:0] { STATE_IDLE, STATE_G } state_t;
     state_t state, state_n;
     logic [2:0] round;
 
@@ -198,12 +198,12 @@ module blake3 (
             STATE_IDLE: if (i_valid) state_n = STATE_G; 
             STATE_G: 
                 if (round == 3'd6) begin 
-                    state_n = STATE_OUTPUT; 
+                    state_n = STATE_IDLE; 
                 end
-            STATE_OUTPUT: state_n = STATE_IDLE;
         endcase
     end
 
+    // Output logic
     always_comb begin
 
         v_col = v;
@@ -253,14 +253,37 @@ module blake3 (
         // Keyed Permutation
         for (int i = 0; i < 16; i++)
             mblock_next[i*32 +: 32] = mblock[c_SCHEDULE[i]*32 +: 32];
-       
+
+        if (round == 6) begin
+            o_valid = 1'b1;
+            o_hash[31:0]    = v_next[0] ^ v_next[8];
+            o_hash[63:32]   = v_next[1] ^ v_next[9];
+            o_hash[95:64]   = v_next[2] ^ v_next[10];
+            o_hash[127:96]  = v_next[3] ^ v_next[11];
+            o_hash[159:128] = v_next[4] ^ v_next[12];
+            o_hash[191:160] = v_next[5] ^ v_next[13];
+            o_hash[223:192] = v_next[6] ^ v_next[14];
+            o_hash[255:224] = v_next[7] ^ v_next[15];
+
+            o_hash[287:256] = v_next[8]  ^ i_chain[31:0];
+            o_hash[319:288] = v_next[9]  ^ i_chain[63:32];
+            o_hash[351:320] = v_next[10] ^ i_chain[95:64];
+            o_hash[383:352] = v_next[11] ^ i_chain[127:96];
+            o_hash[415:384] = v_next[12] ^ i_chain[159:128];
+            o_hash[447:416] = v_next[13] ^ i_chain[191:160];
+            o_hash[479:448] = v_next[14] ^ i_chain[223:192];
+            o_hash[511:480] = v_next[15] ^ i_chain[255:224];
+        end else begin
+            o_valid = 0;
+            o_hash = 512'b0;
+        end
+
     end
     
 
     // Reset and main state machine
     always_ff @(posedge clock) begin
         if (reset) begin
-            o_valid <= 1'b0;
             round <= 3'd0;
             mblock <= 512'b0;
             for (int i=0; i<16; i=i+1) v[i] <= 32'b0;
@@ -268,7 +291,6 @@ module blake3 (
             case (state)
                 STATE_IDLE: begin
                     if (i_valid) begin
-                        o_valid <= 1'b0;
                         v[0] <= i_chain[31 : 0];
                         v[1] <= i_chain[63 : 32];
                         v[2] <= i_chain[95 : 64];
@@ -295,29 +317,6 @@ module blake3 (
                     v <= v_next;
                     mblock <= mblock_next;
                     round <= round + 1;
-                end
-
-                STATE_OUTPUT: begin
-                    o_valid <= 1'b1;
-
-                    o_hash[31:0]    <= v[0] ^ v[8];
-                    o_hash[63:32]   <= v[1] ^ v[9];
-                    o_hash[95:64]   <= v[2] ^ v[10];
-                    o_hash[127:96]  <= v[3] ^ v[11];
-                    o_hash[159:128] <= v[4] ^ v[12];
-                    o_hash[191:160] <= v[5] ^ v[13];
-                    o_hash[223:192] <= v[6] ^ v[14];
-                    o_hash[255:224] <= v[7] ^ v[15];
-
-                    o_hash[287:256] <= v[8]  ^ i_chain[31:0];
-                    o_hash[319:288] <= v[9]  ^ i_chain[63:32];
-                    o_hash[351:320] <= v[10] ^ i_chain[95:64];
-                    o_hash[383:352] <= v[11] ^ i_chain[127:96];
-                    o_hash[415:384] <= v[12] ^ i_chain[159:128];
-                    o_hash[447:416] <= v[13] ^ i_chain[191:160];
-                    o_hash[479:448] <= v[14] ^ i_chain[223:192];
-                    o_hash[511:480] <= v[15] ^ i_chain[255:224];
-
                 end
             endcase
         end
