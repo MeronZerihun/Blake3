@@ -1,7 +1,9 @@
 
+// Clock Period (Slack met): 8ns/cycle
+// Time = 8ns/cycle * (3 + (2 * 7)) cycles = 136ns
 module blake3 (
-    input        i_clk,
-    input        i_reset, 
+    input        clock,
+    input        reset, 
     input [255:0] i_chain,
     input [511:0] i_mblock,
     input [63:0]  i_counter,
@@ -13,13 +15,13 @@ module blake3 (
 );
 
     // State machine
-    typedef enum logic [2:0] { STATE_IDLE=3'd0, STATE_PREPARE=3'd1, STATE_GCOL=3'd2, STATE_GDIAG=3'd3, STATE_OUTPUT=3'd4 } state_t;
+    typedef enum logic [2:0] { STATE_IDLE, STATE_PREPARE, STATE_GCOL, STATE_GDIAG, STATE_OUTPUT } state_t;
     state_t state, state_n;
-    logic [2:0] r_round;
+    logic [2:0] round;
 
     logic [31:0] v [0:15]; 
-    logic [511:0] r_mblock;
-    logic [511:0] r_mblock_buf;
+    logic [511:0] mblock;
+    logic [511:0] mblock_buf;
 
     // Initialization vector
     localparam [31:0] c_IV [0:7] = {
@@ -56,22 +58,22 @@ module blake3 (
         input integer M;
         begin
             case (M)
-                0:  f_A1 = v[A] + v[B] + r_mblock[31:0];
-                1:  f_A1 = v[A] + v[B] + r_mblock[63:32];
-                2:  f_A1 = v[A] + v[B] + r_mblock[95:64];
-                3:  f_A1 = v[A] + v[B] + r_mblock[127:96];
-                4:  f_A1 = v[A] + v[B] + r_mblock[159:128];
-                5:  f_A1 = v[A] + v[B] + r_mblock[191:160];
-                6:  f_A1 = v[A] + v[B] + r_mblock[223:192];
-                7:  f_A1 = v[A] + v[B] + r_mblock[255:224];
-                8:  f_A1 = v[A] + v[B] + r_mblock[287:256];
-                9:  f_A1 = v[A] + v[B] + r_mblock[319:288];
-                10: f_A1 = v[A] + v[B] + r_mblock[351:320];
-                11: f_A1 = v[A] + v[B] + r_mblock[383:352];
-                12: f_A1 = v[A] + v[B] + r_mblock[415:384];
-                13: f_A1 = v[A] + v[B] + r_mblock[447:416];
-                14: f_A1 = v[A] + v[B] + r_mblock[479:448];
-                15: f_A1 = v[A] + v[B] + r_mblock[511:480];
+                0:  f_A1 = v[A] + v[B] + mblock[31:0];
+                1:  f_A1 = v[A] + v[B] + mblock[63:32];
+                2:  f_A1 = v[A] + v[B] + mblock[95:64];
+                3:  f_A1 = v[A] + v[B] + mblock[127:96];
+                4:  f_A1 = v[A] + v[B] + mblock[159:128];
+                5:  f_A1 = v[A] + v[B] + mblock[191:160];
+                6:  f_A1 = v[A] + v[B] + mblock[223:192];
+                7:  f_A1 = v[A] + v[B] + mblock[255:224];
+                8:  f_A1 = v[A] + v[B] + mblock[287:256];
+                9:  f_A1 = v[A] + v[B] + mblock[319:288];
+                10: f_A1 = v[A] + v[B] + mblock[351:320];
+                11: f_A1 = v[A] + v[B] + mblock[383:352];
+                12: f_A1 = v[A] + v[B] + mblock[415:384];
+                13: f_A1 = v[A] + v[B] + mblock[447:416];
+                14: f_A1 = v[A] + v[B] + mblock[479:448];
+                15: f_A1 = v[A] + v[B] + mblock[511:480];
             endcase
         end
     endfunction
@@ -101,22 +103,22 @@ module blake3 (
         input integer A; input integer B; input integer C; input integer D; input [4:0] M;
         begin
             case (M)
-                0:  f_A2 = f_A1(A,B,M-1) + f_B1(A,B,C,D,M) + r_mblock[31:0];
-                1:  f_A2 = f_A1(A,B,M-1) + f_B1(A,B,C,D,M) + r_mblock[63:32];
-                2:  f_A2 = f_A1(A,B,M-1) + f_B1(A,B,C,D,M) + r_mblock[95:64];
-                3:  f_A2 = f_A1(A,B,M-1) + f_B1(A,B,C,D,M) + r_mblock[127:96];
-                4:  f_A2 = f_A1(A,B,M-1) + f_B1(A,B,C,D,M) + r_mblock[159:128];
-                5:  f_A2 = f_A1(A,B,M-1) + f_B1(A,B,C,D,M) + r_mblock[191:160];
-                6:  f_A2 = f_A1(A,B,M-1) + f_B1(A,B,C,D,M) + r_mblock[223:192];
-                7:  f_A2 = f_A1(A,B,M-1) + f_B1(A,B,C,D,M) + r_mblock[255:224];
-                8:  f_A2 = f_A1(A,B,M-1) + f_B1(A,B,C,D,M) + r_mblock[287:256];
-                9:  f_A2 = f_A1(A,B,M-1) + f_B1(A,B,C,D,M) + r_mblock[319:288];
-                10: f_A2 = f_A1(A,B,M-1) + f_B1(A,B,C,D,M) + r_mblock[351:320];
-                11: f_A2 = f_A1(A,B,M-1) + f_B1(A,B,C,D,M) + r_mblock[383:352];
-                12: f_A2 = f_A1(A,B,M-1) + f_B1(A,B,C,D,M) + r_mblock[415:384];
-                13: f_A2 = f_A1(A,B,M-1) + f_B1(A,B,C,D,M) + r_mblock[447:416];
-                14: f_A2 = f_A1(A,B,M-1) + f_B1(A,B,C,D,M) + r_mblock[479:448];
-                15: f_A2 = f_A1(A,B,M-1) + f_B1(A,B,C,D,M) + r_mblock[511:480];
+                0:  f_A2 = f_A1(A,B,M-1) + f_B1(A,B,C,D,M) + mblock[31:0];
+                1:  f_A2 = f_A1(A,B,M-1) + f_B1(A,B,C,D,M) + mblock[63:32];
+                2:  f_A2 = f_A1(A,B,M-1) + f_B1(A,B,C,D,M) + mblock[95:64];
+                3:  f_A2 = f_A1(A,B,M-1) + f_B1(A,B,C,D,M) + mblock[127:96];
+                4:  f_A2 = f_A1(A,B,M-1) + f_B1(A,B,C,D,M) + mblock[159:128];
+                5:  f_A2 = f_A1(A,B,M-1) + f_B1(A,B,C,D,M) + mblock[191:160];
+                6:  f_A2 = f_A1(A,B,M-1) + f_B1(A,B,C,D,M) + mblock[223:192];
+                7:  f_A2 = f_A1(A,B,M-1) + f_B1(A,B,C,D,M) + mblock[255:224];
+                8:  f_A2 = f_A1(A,B,M-1) + f_B1(A,B,C,D,M) + mblock[287:256];
+                9:  f_A2 = f_A1(A,B,M-1) + f_B1(A,B,C,D,M) + mblock[319:288];
+                10: f_A2 = f_A1(A,B,M-1) + f_B1(A,B,C,D,M) + mblock[351:320];
+                11: f_A2 = f_A1(A,B,M-1) + f_B1(A,B,C,D,M) + mblock[383:352];
+                12: f_A2 = f_A1(A,B,M-1) + f_B1(A,B,C,D,M) + mblock[415:384];
+                13: f_A2 = f_A1(A,B,M-1) + f_B1(A,B,C,D,M) + mblock[447:416];
+                14: f_A2 = f_A1(A,B,M-1) + f_B1(A,B,C,D,M) + mblock[479:448];
+                15: f_A2 = f_A1(A,B,M-1) + f_B1(A,B,C,D,M) + mblock[511:480];
             endcase
         end
     endfunction
@@ -144,8 +146,8 @@ module blake3 (
 
     
     // State transition
-    always_ff @(posedge i_clk) begin
-        if (i_reset) begin
+    always_ff @(posedge clock) begin
+        if (reset) begin
             state <= STATE_IDLE;
         end else begin
             state <= state_n;
@@ -160,7 +162,7 @@ module blake3 (
             STATE_PREPARE: state_n = STATE_GCOL;
             STATE_GCOL: state_n = STATE_GDIAG;
             STATE_GDIAG: 
-                if (r_round == 3'd6) begin 
+                if (round == 3'd6) begin 
                     state_n = STATE_OUTPUT; 
                 end else begin 
                     // New round
@@ -172,13 +174,13 @@ module blake3 (
     
 
     // Reset and main state machine
-    always_ff @(posedge i_clk) begin
-        if (i_reset) begin
+    always_ff @(posedge clock) begin
+        if (reset) begin
             o_valid <= 1'b0;
             o_hash <= 512'b0;
-            r_round <= 3'd0;
-            r_mblock <= 512'b0;
-            r_mblock_buf <= 512'b0;
+            round <= 3'd0;
+            mblock <= 512'b0;
+            mblock_buf <= 512'b0;
             for (int i=0; i<16; i=i+1) v[i] <= 32'b0;
         end else begin
             case (state)
@@ -207,43 +209,43 @@ module blake3 (
                     v[13] <= i_counter[63:32];
                     v[14] <= i_numbytes;
                     v[15] <= i_dflags;
-                    r_round <= 3'd0;
-                    r_mblock <= i_mblock;
-                    r_mblock_buf <= i_mblock;
+                    round <= 3'd0;
+                    mblock <= i_mblock;
+                    mblock_buf <= i_mblock;
                 end
 
                 STATE_GCOL: begin
                     // G0(v0, v4, v8, v12)
                     v[0]  <= f_A2(0, 4, 8, 12, 1);
-                    v[4]  <= f_D2(0, 4, 8, 12, 1);
+                    v[4] <= f_B2(0, 4, 8, 12, 1);
                     v[8]  <= f_C2(0, 4, 8, 12, 1);
-                    v[12] <= f_B2(0, 4, 8, 12, 1);
+                    v[12]  <= f_D2(0, 4, 8, 12, 1);
 
                     // G1(v1, v5, v9, v13)
                     v[1]  <= f_A2(1, 5, 9, 13, 3);
-                    v[5]  <= f_D2(1, 5, 9, 13, 3);
+                    v[5]  <= f_B2(1, 5, 9, 13, 3);
                     v[9]  <= f_C2(1, 5, 9, 13, 3);
-                    v[13] <= f_B2(1, 5, 9, 13, 3);
+                    v[13] <= f_D2(1, 5, 9, 13, 3);
 
                     // G2(v2, v6, v10, v14)
                     v[2]  <= f_A2(2, 6, 10, 14, 5);
-                    v[6]  <= f_D2(2, 6, 10, 14, 5);
+                    v[6]  <= f_B2(2, 6, 10, 14, 5);
                     v[10] <= f_C2(2, 6, 10, 14, 5);
-                    v[14] <= f_B2(2, 6, 10, 14, 5);
+                    v[14] <= f_D2(2, 6, 10, 14, 5);
 
                     // G3(v3, v7, v11, v15)
                     v[3]  <= f_A2(3, 7, 11, 15, 7);
-                    v[7]  <= f_D2(3, 7, 11, 15, 7);
+                    v[7]  <= f_B2(3, 7, 11, 15, 7);
                     v[11] <= f_C2(3, 7, 11, 15, 7);
-                    v[15] <= f_B2(3, 7, 11, 15, 7);
+                    v[15] <= f_D2(3, 7, 11, 15, 7);
 
-                    // Update r_mblock_buf to the permuted message block
-                    r_mblock_buf <= r_mblock;
+                    // Update mblock_buf to the permuted message block
+                    mblock_buf <= mblock;
                     
                 end
 
                 STATE_GDIAG: begin
-                    // G4(v1, v6, v11, v12)
+                    // G4(v0, v5, v10, v15)
                     v[0]  <= f_A2(0, 5, 10, 15, 9);
                     v[5]  <= f_B2(0, 5, 10, 15, 9);
                     v[10] <= f_C2(0, 5, 10, 15, 9);
@@ -267,27 +269,27 @@ module blake3 (
                     v[9]  <= f_C2(3, 4, 9, 14, 15);
                     v[14] <= f_D2(3, 4, 9, 14, 15);
 
-                    r_round <= r_round + 1;
-                    if (r_round == 3'd6) begin
-                        r_round <= 3'd0;
+                    round <= round + 1;
+                    if (round == 3'd6) begin
+                        round <= 3'd0;
                     end else begin
                         // Permutate msg key schedule for next round
-                        r_mblock[31:0]    <= r_mblock_buf[c_SCHEDULE[0]*32+32-1  : c_SCHEDULE[0]*32];
-                        r_mblock[63:32]   <= r_mblock_buf[c_SCHEDULE[1]*32+32-1  : c_SCHEDULE[1]*32];
-                        r_mblock[95:64]   <= r_mblock_buf[c_SCHEDULE[2]*32+32-1  : c_SCHEDULE[2]*32];
-                        r_mblock[127:96]  <= r_mblock_buf[c_SCHEDULE[3]*32+32-1  : c_SCHEDULE[3]*32];
-                        r_mblock[159:128] <= r_mblock_buf[c_SCHEDULE[4]*32+32-1  : c_SCHEDULE[4]*32];
-                        r_mblock[191:160] <= r_mblock_buf[c_SCHEDULE[5]*32+32-1  : c_SCHEDULE[5]*32];
-                        r_mblock[223:192] <= r_mblock_buf[c_SCHEDULE[6]*32+32-1  : c_SCHEDULE[6]*32];
-                        r_mblock[255:224] <= r_mblock_buf[c_SCHEDULE[7]*32+32-1  : c_SCHEDULE[7]*32];
-                        r_mblock[287:256] <= r_mblock_buf[c_SCHEDULE[8]*32+32-1  : c_SCHEDULE[8]*32];
-                        r_mblock[319:288] <= r_mblock_buf[c_SCHEDULE[9]*32+32-1  : c_SCHEDULE[9]*32];
-                        r_mblock[351:320] <= r_mblock_buf[c_SCHEDULE[10]*32+32-1 : c_SCHEDULE[10]*32];
-                        r_mblock[383:352] <= r_mblock_buf[c_SCHEDULE[11]*32+32-1 : c_SCHEDULE[11]*32];
-                        r_mblock[415:384] <= r_mblock_buf[c_SCHEDULE[12]*32+32-1 : c_SCHEDULE[12]*32];
-                        r_mblock[447:416] <= r_mblock_buf[c_SCHEDULE[13]*32+32-1 : c_SCHEDULE[13]*32];
-                        r_mblock[479:448] <= r_mblock_buf[c_SCHEDULE[14]*32+32-1 : c_SCHEDULE[14]*32];
-                        r_mblock[511:480] <= r_mblock_buf[c_SCHEDULE[15]*32+32-1 : c_SCHEDULE[15]*32];
+                        mblock[31:0]    <= mblock_buf[c_SCHEDULE[0]*32+32-1  : c_SCHEDULE[0]*32];
+                        mblock[63:32]   <= mblock_buf[c_SCHEDULE[1]*32+32-1  : c_SCHEDULE[1]*32];
+                        mblock[95:64]   <= mblock_buf[c_SCHEDULE[2]*32+32-1  : c_SCHEDULE[2]*32];
+                        mblock[127:96]  <= mblock_buf[c_SCHEDULE[3]*32+32-1  : c_SCHEDULE[3]*32];
+                        mblock[159:128] <= mblock_buf[c_SCHEDULE[4]*32+32-1  : c_SCHEDULE[4]*32];
+                        mblock[191:160] <= mblock_buf[c_SCHEDULE[5]*32+32-1  : c_SCHEDULE[5]*32];
+                        mblock[223:192] <= mblock_buf[c_SCHEDULE[6]*32+32-1  : c_SCHEDULE[6]*32];
+                        mblock[255:224] <= mblock_buf[c_SCHEDULE[7]*32+32-1  : c_SCHEDULE[7]*32];
+                        mblock[287:256] <= mblock_buf[c_SCHEDULE[8]*32+32-1  : c_SCHEDULE[8]*32];
+                        mblock[319:288] <= mblock_buf[c_SCHEDULE[9]*32+32-1  : c_SCHEDULE[9]*32];
+                        mblock[351:320] <= mblock_buf[c_SCHEDULE[10]*32+32-1 : c_SCHEDULE[10]*32];
+                        mblock[383:352] <= mblock_buf[c_SCHEDULE[11]*32+32-1 : c_SCHEDULE[11]*32];
+                        mblock[415:384] <= mblock_buf[c_SCHEDULE[12]*32+32-1 : c_SCHEDULE[12]*32];
+                        mblock[447:416] <= mblock_buf[c_SCHEDULE[13]*32+32-1 : c_SCHEDULE[13]*32];
+                        mblock[479:448] <= mblock_buf[c_SCHEDULE[14]*32+32-1 : c_SCHEDULE[14]*32];
+                        mblock[511:480] <= mblock_buf[c_SCHEDULE[15]*32+32-1 : c_SCHEDULE[15]*32];
                     
                     end
                 end

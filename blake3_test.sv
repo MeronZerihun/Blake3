@@ -2,35 +2,34 @@
 module blake3_tb;
 
     logic w_clk, w_reset;
-    // DUT signals (sizes taken from VHDL)
     logic  [255:0] c_CHAIN;
     logic  [511:0] c_MBLOCK;
     logic  [63:0]  c_COUNTER;
     logic  [31:0]  c_NUMBYTES;
     logic  [31:0]  c_DFLAGS;
-    logic          r_i_valid;
+    logic          i_valid;
 
-    logic [511:0] r_hash;
-    logic         r_o_valid;
+    logic [511:0] o_hash;
+    logic         o_valid;
     logic [511:0] c_HASH;
 
     logic correct;
 
     // Instantiate DUT
     blake3 dut (
-        .i_clk      (w_clk),
-        .i_reset    (w_reset),
+        .clock      (w_clk),
+        .reset    (w_reset),
         .i_chain    (c_CHAIN),
         .i_mblock   (c_MBLOCK),
         .i_counter  (c_COUNTER),
         .i_numbytes (c_NUMBYTES),
         .i_dflags   (c_DFLAGS),
-        .i_valid    (r_i_valid),
-        .o_hash     (r_hash),
-        .o_valid    (r_o_valid)
+        .i_valid    (i_valid),
+        .o_hash     (o_hash),
+        .o_valid    (o_valid)
     );
 
-    assign correct = ~r_o_valid || (r_hash === c_HASH);
+    assign correct = ~o_valid || (o_hash === c_HASH);
 
     // CLOCK_PERIOD is defined on the commandline by the makefile
     always begin
@@ -38,7 +37,7 @@ module blake3_tb;
         w_clk = ~w_clk;
         if (!correct) begin
             $display("@@@ Incorrect at time %4.0f", $time);
-            $display("@@@ r_hash:%h ", r_hash);
+            $display("@@@ hash:%h ", o_hash);
             $finish;
         end
     end
@@ -48,9 +47,9 @@ module blake3_tb;
     // prevents that by making sure "done" is high at the clock edge.
     task wait_until_done;
         forever begin : wait_loop
-            @(posedge r_o_valid);
+            @(posedge o_valid);
             @(negedge w_clk);
-            if (r_o_valid) begin
+            if (o_valid) begin
                 disable wait_until_done;
             end
         end
@@ -58,19 +57,16 @@ module blake3_tb;
 
     initial begin
 
-        $monitor("Time:%5d mblock: %h r_hash:%h c_hash: %h state: %b", 
-                 $time, c_MBLOCK, r_hash, c_HASH, dut.state);
-
         w_clk = 0;
         w_reset = 1;
-        r_i_valid = 0;
+        i_valid = 0;
         c_CHAIN = 256'h0;
         c_MBLOCK = 512'h0;
         c_COUNTER = 64'h0;
         c_NUMBYTES = 32'h0;
         c_DFLAGS = 32'h0;
 
-        // Initializing inputs
+        // Hash has been verified using https://emn178.github.io/online-tools/blake3/
         c_HASH = {
             32'hc5b847a2,
             32'ha79985ee, 
@@ -101,7 +97,9 @@ module blake3_tb;
             32'hbb67ae85, 
             32'h6a09e667
         };
-        
+
+        // mblock: Hello World!\n - 13 bytes
+        // arranged in little endian
         c_MBLOCK = {
             384'b0,                
             32'h0000000a,
@@ -111,17 +109,17 @@ module blake3_tb;
         }; 
 
         c_COUNTER = 64'b0;
-        c_NUMBYTES = 13;
-        // Setting flags: CHUNK_START, CHUNK_END, ROOT
+        c_NUMBYTES = 32'd13;
+        // Setting flags 0: CHUNK_START, 1: CHUNK_END, 3: ROOT
         c_DFLAGS = 32'b0000_0000_0000_0000_0000_0000_0000_1011;
 
         @(negedge w_clk);
-        r_i_valid = 1;
+        i_valid = 1;
         w_reset = 0;
         wait_until_done();
 
         // Wait for output
-        $display("Passed; r_o_valid=%b r_hash=%h c_hash=%h", r_o_valid, r_hash, c_HASH);
+        $display("Passed; o_valid=%b hash=%h c_hash=%h", o_valid, o_hash, c_HASH);
 
         $finish;
     end

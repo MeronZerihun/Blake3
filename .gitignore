@@ -32,6 +32,7 @@ urgReport/
 *.svf
 *.mr
 *.pvl
+/synth
 
 # verdi
 verdi*
